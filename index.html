@@ -1,54 +1,43 @@
-#!/bin/bash
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Minecraft Controller</title>
+    <style>
+        body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; padding: 50px; }
+        .btn { padding: 20px 40px; font-size: 20px; cursor: pointer; border-radius: 10px; border: none; margin: 10px; transition: 0.3s; }
+        .start { background: #27ae60; color: white; }
+        .start:hover { background: #2ecc71; }
+        .stop { background: #c0392b; color: white; }
+        .stop:hover { background: #e74c3c; }
+        #status { margin-top: 20px; font-style: italic; color: #f1c40f; }
+    </style>
+</head>
+<body>
+    <h1>🎮 Server Control Panel</h1>
+    <button class="btn start" onclick="callIDX('start-server')">BẬT SERVER</button>
+    <button class="btn stop" onclick="callIDX('stop-server')">TẮT SERVER</button>
+    <div id="status">Trạng thái: Sẵn sàng</div>
 
-# --- CẤU HÌNH ---
-WEBHOOK_URL="https://discord.com/api/webhooks/1460633815578968239/E5Ck-CCpCwQNUtGXA9z-VpWwcQzZz7M7meSapdb8i7f0cZ_XdnOg4EHeCQ6x4rfmga_2"
+    <script>
+        // THAY LINK IDX CỦA BẠN VÀO ĐÂY
+        const IDX_URL = "https://8080-xxxxx.idx.google.com"; 
 
-# Tối ưu SSH: Gửi tín hiệu giữ kết nối mỗi 5 giây
-SSH_OPTS="-p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=5 -o ServerAliveCountMax=3 -o ConnectTimeout=10"
+        function callIDX(endpoint) {
+            document.getElementById('status').innerText = "Đang gửi lệnh...";
+            fetch(`${IDX_URL}/${endpoint}`)
+                .then(res => res.text())
+                .then(data => {
+                    document.getElementById('status').innerText = "Thông báo: " + data;
+                })
+                .catch(err => {
+                    document.getElementById('status').innerText = "Lỗi: IDX chưa bật hoặc sai link!";
+                });
+        }
 
-CMD_JAVA="ssh $SSH_OPTS -R0:localhost:25565 tcp@ap.free.pinggy.io"
-CMD_BEDROCK="ssh $SSH_OPTS -R0:localhost:25565 udp@ap.free.pinggy.io"
-
-while true
-do
-    echo "--- [$(date '+%H:%M:%S')] Đang dọn dẹp và khởi động Tunnel mới ---"
-    pkill -f "ap.free.pinggy.io"
-    sleep 3
-
-    # Chạy Java & Bedrock dưới nền
-    $CMD_JAVA > log_java.txt 2>&1 &
-    PID_JAVA=$!
-    $CMD_BEDROCK > log_bedrock.txt 2>&1 &
-    PID_BEDROCK=$!
-
-    # Chờ lấy IP
-    sleep 15
-    IP_JAVA=$(grep -oE '(tcp|udp)://[a-zA-Z0-9.-]+\.pinggy\.link:[0-9]+' log_java.txt | sed 's|.*://||' | head -n 1)
-    IP_BEDROCK=$(grep -oE '(tcp|udp)://[a-zA-Z0-9.-]+\.pinggy\.link:[0-9]+' log_bedrock.txt | sed 's|.*://||' | head -n 1)
-
-    if [ ! -z "$IP_JAVA" ] || [ ! -z "$IP_BEDROCK" ]; then
-        MESSAGE="🔄 **SERVER RESTARTED / UPDATED** 🔄\n\n☕ **JAVA:** \`$IP_JAVA\`\n📱 **BEDROCK:** \`$IP_BEDROCK\`\n\n*(Chạm vào IP để copy)*"
-        curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"$MESSAGE\"}" $WEBHOOK_URL
-    fi
-
-    # VÒNG LẶP KIỂM TRA "SỨC KHỎE" TUNNEL (Mỗi 10 giây)
-    for (( i=1; i<=360; i++ ))
-    do
-        sleep 10
-        # 1. Kiểm tra xem tiến trình SSH có còn sống không
-        if ! kill -0 $PID_JAVA 2>/dev/null || ! kill -0 $PID_BEDROCK 2>/dev/null; then
-            echo "Phát hiện Tunnel sập sớm! Đang khởi động lại..."
-            break
-        fi
-
-        # 2. Chủ động reset sau 55 phút để tránh Pinggy tự ngắt đột ngột
-        if [ $i -eq 330 ]; then
-            echo "Đã chạy 55 phút, chủ động reset để làm mới thời gian..."
-            break
-        fi
-    done
-
-    # Trước khi kết thúc vòng lặp để quay lại đầu, giết sạch các PID cũ
-    kill $PID_JAVA $PID_BEDROCK 2>/dev/null
-    sleep 2
-done
+        // Tính năng TinyTask: Tự tắt khi đóng web
+        window.onbeforeunload = function() {
+            navigator.sendBeacon(`${IDX_URL}/stop-server`);
+        };
+    </script>
+</body>
+</html>
